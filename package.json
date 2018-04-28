@@ -1,0 +1,22 @@
+{
+  "name": "douban-spider",
+  "version": "1.0.0",
+  "description": "a node spider",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "node",
+    "cheerio",
+    "commander"
+  ],
+  "author": "MrElvin",
+  "license": "ISC",
+  "dependencies": {
+    "chalk": "^2.4.1",
+    "cheerio": "^1.0.0-rc.2",
+    "colors": "^1.2.1",
+    "commander": "^2.15.1"
+  }
+}
