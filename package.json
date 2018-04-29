@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "a node spider",
   "main": "index.js",
+  "bin": {
+    "douban": "index"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -16,7 +19,9 @@
   "dependencies": {
     "chalk": "^2.4.1",
     "cheerio": "^1.0.0-rc.2",
-    "colors": "^1.2.1",
-    "commander": "^2.15.1"
+    "commander": "^2.15.1",
+    "progress": "^2.0.0",
+    "request": "^2.85.0",
+    "request-promise": "^4.2.2"
   }
 }

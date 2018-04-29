@@ -1,0 +1,77 @@
+#! /usr/local/bin/node
+const program = require('commander')
+const pkg = require('./package')
+const chalk = require('chalk')
+const handler = require('./handler')
+
+program
+  .version(chalk.yellow(pkg.version), '-v, --version')
+  .option('-f, --file <filePath>', 'set the output file (support .md .txt)')
+
+program
+  .command('show')
+  .description('show list of movies in theatre or coming soon')
+  .option("-n, --now", "show list of movies in theatre")
+  .option("-s, --soon", "show list of movies coming soon")
+  .action((cmd) => {
+    handler.show(cmd)
+  })
+  .on('--help', function(){
+    console.log(`
+  Examples:
+
+    ${chalk.keyword('orange')('$ douban show -n')}
+    ${chalk.keyword('orange')('$ douban show --now')}
+    `)
+  })
+
+program
+  .command('imdb [count] [start]')
+  .description('show first count movies in IMDB Top250 (default: 0 50)')
+  .action((count, start = 0, cmd) => {
+    handler.imdb(count, start, cmd)
+  })
+  .on('--help', function(){
+    console.log(`
+  Examples:
+
+    ${chalk.keyword('orange')('$ douban imdb')}
+    ${chalk.keyword('orange')('$ douban imdb 80')}
+    `)
+  })
+
+program
+  .command('summary [year]')
+  .description('show the given year\'s movie report (default: last year)')
+  .action((year = 2017) => {
+    handler.summary(year)
+  })
+  .on('--help', function(){
+    console.log(`
+  Examples:
+
+    ${chalk.keyword('orange')('$ douban summary')}
+    ${chalk.keyword('orange')('$ douban summary 2017')}
+    `)
+  })
+
+program
+  .command('search [query]')
+  .description('search keywords (default: search movies)')
+  .option("-m, --movie <movie>", "search for the movie")
+  .option("-s, --star <star>", "search for the star")
+  .option("-t, --tag <tag>", "search for the tag")
+  .action((query, cmd) => {
+    handler.search(query, cmd)
+  })
+  .on('--help', function(){
+    console.log(`
+  Examples:
+
+    ${chalk.keyword('orange')('$ douban search movieName')}
+    ${chalk.keyword('orange')('$ douban search -m movieName')}
+    ${chalk.keyword('orange')('$ douban search --movie movieName')}
+    `)
+  })
+
+program.parse(process.argv)

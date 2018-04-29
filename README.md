@@ -1,2 +1,2 @@
 # movie-spider
-a node command line tool for getting douban movie info
+A node command line tool for getting douban movie info
