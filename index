@@ -10,8 +10,8 @@ program
 
 program
   .command('show')
-  .description('show list of movies in theatre or coming soon')
-  .option("-n, --now", "show list of movies in theatre")
+  .description('show list of movies in theatre or coming soon (default: in theatre)')
+  .option("-n, --now", "show list of movies (rating at least 6.0) in theatre")
   .option("-s, --soon", "show list of movies coming soon")
   .action((cmd) => {
     handler.show(cmd)
