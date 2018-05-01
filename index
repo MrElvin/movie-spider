@@ -43,8 +43,8 @@ program
 program
   .command('summary [year]')
   .description('show the given year\'s movie report (default: last year)')
-  .action((year = 2017) => {
-    handler.summary(year)
+  .action((year = (new Date()).getFullYear() - 1, cmd) => {
+    handler.summary(year, cmd)
   })
   .on('--help', function(){
     console.log(`
@@ -60,7 +60,6 @@ program
   .description('search keywords (default: search movies)')
   .option("-m, --movie <movie>", "search for the movie")
   .option("-s, --star <star>", "search for the star")
-  .option("-t, --tag <tag>", "search for the tag")
   .action((query, cmd) => {
     handler.search(query, cmd)
   })

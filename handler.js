@@ -4,15 +4,16 @@ const ProgressBar = require('progress')
 const chalk = require('chalk')
 const fs = require('fs')
 const path = require('path')
-const util = require('util')
 
 const DEFAULT_COUNT = 50
 
 const URL = {
-  IMDB: `http://api.douban.com/v2/movie/top250`,
-  SHOW_THEATERS: `http://api.douban.com/v2/movie/in_theaters?count=${DEFAULT_COUNT}`,
-  COMING_SOON: `http://api.douban.com/v2/movie/coming_soon?count=${DEFAULT_COUNT}`,
-  MOVIE: `https://movie.douban.com/subject/`
+  IMDB: `https://api.douban.com/v2/movie/top250`,
+  SHOW_THEATERS: `https://api.douban.com/v2/movie/in_theaters?count=${DEFAULT_COUNT}`,
+  COMING_SOON: `https://api.douban.com/v2/movie/coming_soon?count=${DEFAULT_COUNT}`,
+  MOVIE: `https://movie.douban.com/subject/`,
+  SUMMARY: `https://movie.douban.com/ithil_j/activity/movie_annual`,
+  SEARCH: `https://api.douban.com/v2/movie/search?q=`
 }
 
 const bar = new ProgressBar(`进度 [:bar] ${chalk.yellowBright(':percent')}${chalk.yellow(' / :total%')} ${chalk.yellow(':info')} `, {
@@ -52,7 +53,7 @@ const show = async (ctx) => {
     const directors = $('a[rel="v:directedBy"]').text()
     const releaseDate = $('span[property="v:initialReleaseDate"]').text()
     const runtime = $('span[property="v:runtime"]').text()
-    const buyLink = ctx.now ? decodeURIComponent($('a.ticket-btn').attr('href').split('url=')[1]) : ''
+    const buyLink = ctx.soon ? '' : decodeURIComponent($('a.ticket-btn').attr('href').split('url=')[1])
     const summary = $('span[property="v:summary"]').text().split('\n').map(string => string.trim()).filter(string => string !== '')
     const roleList = Array.from($('.celebrities-list .celebrity').map((index, celebrity) => {
       return {
@@ -82,21 +83,20 @@ const show = async (ctx) => {
   }
   bar.tick(5, { info: '格式化内容...' })
   const print = moviesInTheater.map(movie => {
+    if (ctx.parent.file) {
+      return `![${movie.title}](${movie.image})\n### ${movie.title}           ${movie.average_rating}\n##### ${movie.original_title}\n- 导演： ${movie.directors !== '' ? movie.directors : '暂无信息'}\n- 主演： ${movie.actors !== '' ? movie.actors : '暂无信息'}\n- 类型： ${movie.genres}\n- 上映日期： ${movie.releaseDate !== '' ? movie.releaseDate.replace(/\)/g, '\) ') : '暂无信息'}\n- 影片时长： ${movie.runtime !== '' ? movie.runtime : '暂无信息'}\n- 剧情简介：${movie.summary ? '\n' + movie.summary.join('\n') : '暂无信息'}\n- 演职员表：${movie.roleList ? '\n' + movie.roleList.filter(role => role.role !== '').map((role, index) => `  - **${role.name}**    ${role.role}\n\n`).join('') : '暂无信息'}\n${ctx.now ? `- 网友热评：${movie.comments !== undefined ? '\n' + movie.comments.map((comment, index) => `> **${index + 1}   ${comment.commentUser}**         ${comment.commentTime}        ${comment.commentVote}\n> ${comment.commentDetail}\n\n`).join('') : '暂无评论'}` : ''}\n${ctx.soon ? '' : `- 购票链接： [${movie.title}](${movie.buyLink})`}`
+    }
     return `
-![${movie.title}](${movie.image})
-### ${movie.title}           ${movie.average_rating}
-##### ${movie.original_title}
-- 导演： ${movie.directors !== '' ? movie.directors : '暂无信息'}
-- 主演： ${movie.actors !== '' ? movie.actors : '暂无信息'}
-- 类型： ${movie.genres}
-- 上映日期： ${movie.releaseDate !== '' ? movie.releaseDate : '暂无信息'}
-- 影片时长： ${movie.runtime !== '' ? movie.runtime : '暂无信息'}
-- 剧情简介：${movie.summary ? '\n' + movie.summary.join('\n') : '暂无信息'}
-- 演职员表：${movie.roleList ? '\n' + movie.roleList.filter(role => role.role !== '').map((role, index) => `  - **${role.name}**    ${role.role}\n\n`).join('') : '暂无信息'}
-${ctx.now ? `- 网友热评：${movie.comments !== undefined ? '\n' + movie.comments.map((comment, index) => `> **${index + 1}   ${comment.commentUser}**         ${comment.commentTime}        ${comment.commentVote}\n> ${comment.commentDetail}\n\n`).join('') : '暂无评论'}` : ''}
-${ctx.now ? `- 购票链接： [${movie.title}](${movie.buyLink})` : ''}
+      ${chalk.bold.keyword('wheat')('标   题')} - ${chalk.bold.keyword('skyblue')(movie.title)} ${chalk.bold.keyword('skyblue')(movie.original_title)}
+      ${chalk.bold.keyword('wheat')('评   分')} - ${chalk.bold.keyword('skyblue')(movie.average_rating)}
+      ${chalk.bold.keyword('wheat')('题   材')} - ${chalk.bold.keyword('skyblue')(movie.genres)}
+      ${chalk.bold.keyword('wheat')('演职员表')}\n      ${chalk.bold.keyword('skyblue')(movie.roleList ? movie.roleList.filter(role => role.role !== '').map((role, index) => `  ${chalk.white('-')} ${role.name}    ${role.role}`).join(`\n      `) : '暂无信息')}
+      ${chalk.bold.keyword('wheat')('上映日期')} - ${chalk.bold.keyword('skyblue')(movie.releaseDate.replace(/\)/g, '\) '))}
+      ${chalk.bold.keyword('wheat')('影片时长')} - ${chalk.bold.keyword('skyblue')(movie.runtime !== '' ? movie.runtime : '暂无信息')}
+      ${chalk.bold.keyword('wheat')('剧情简介')}\n        - ${chalk.bold.keyword('skyblue')(movie.summary ? movie.summary.join('\n') : '暂无信息')}
+      ${ctx.soon ? '' : `${chalk.bold.keyword('wheat')('购票链接')} - ${chalk.bold.keyword('skyblue')(movie.buyLink)}`}
       `
-    })
+  })
   bar.tick(5, { info: '格式化内容成功，准备写入' })
   if (ctx.parent.file) {
     return fs.writeFile(ctx.parent.file, print.join('\n\n'), 'utf-8', (err) => {
@@ -173,22 +173,201 @@ const imdb = async (count = DEFAULT_COUNT, start, ctx) => {
   })
 }
 
-const summary = (year) => {
-  console.log(year)
-}
-
-const search = (query, ctx) => {
-  if (query) {
-    console.log(query)
-  } else {
-    if (ctx.movie) {
-      console.log('movie')
-    } else if (ctx.star) {
-      console.log('star')
-    } else if (ctx.tag) {
-      console.log('tag')
+const summary = async (year, ctx) => {
+  if (year < 2016 || year >= (new Date()).getFullYear()) return console.log(chalk.keyword('wheat')(`目前只支持查询 2016 年 - ${(new Date()).getFullYear() - 1} 年`))
+  bar.tick(10, { info: '查询总结内容项目数...' })
+  const summaryTotalInfo = JSON.parse(await rp(`${URL.SUMMARY}${year}`))
+  const summaryNavList = summaryTotalInfo.res.widget_infos.slice(1, -2)
+  bar.tick(10, { info: '查询项目数成功' })
+  const summaryDialogueArr = []
+  const summaryTop10Arr = []
+  const summaryPeopleArr = []
+  const summaryListPromises = summaryNavList.map(async (summaryItem, index) => await rp(`${URL.SUMMARY}${year}/widget/${index + 1}`))
+  bar.tick(10, { info: '获取每个总结项目信息...' })
+  for (let index = 0; index < summaryListPromises.length; index++) {
+    const summaryItem = JSON.parse(await summaryListPromises[index]).res
+    bar.tick(50 / summaryListPromises.length)
+    const summaryItemInfo = {}
+    if (summaryItem.kind_str === 'dialogue') {
+      summaryItemInfo.type = 'dialogue'
+      summaryItemInfo.text = summaryItem.payload.text
+      summaryItemInfo.movieTitle = summaryItem.subject.title
+      summaryItemInfo.orig_title = summaryItem.subject.orig_title
+      summaryItemInfo.rating = summaryItem.subject.rating
+      summaryDialogueArr.push(summaryItemInfo)
+    } else if (summaryItem.kind_str === 'person') {
+      summaryItemInfo.type = 'person'
+      summaryItemInfo.summaryTitle = summaryItem.payload.title.replace(/\|/g, '')
+      summaryItemInfo.people = summaryItem.people
+      summaryPeopleArr.push(summaryItemInfo)
+    } else if (summaryItem.kind_str === 'top10') {
+      summaryItemInfo.type = 'top10'
+      summaryItemInfo.summaryTitle = summaryItem.payload.title.replace(/\|/g, '')
+      summaryItemInfo.movies = summaryItem.subjects
+      summaryTop10Arr.push(summaryItemInfo)
     }
   }
+  bar.tick(5, { info: '处理每个总结项目信息...' })
+  const printDialogue = summaryDialogueArr.map(summaryItem => {
+    if (ctx.parent.file) {
+      return `\n- ${summaryItem.text}\n     ----  **${summaryItem.movieTitle}**    ${summaryItem.orig_title ? '*' + summaryItem.orig_title + '*' : ''}  **${summaryItem.rating}**\n\n`
+    }
+    return `
+      ${chalk.keyword('wheat')(summaryItem.text.replace(/^\s+|\s+$/g, ''),)}\n                            ---- ${chalk.italic.keyword('lightsteelblue')(summaryItem.movieTitle)}   ${chalk.italic.keyword('lightsteelblue')(summaryItem.orig_title ? summaryItem.orig_title : '')}   ${chalk.bold.keyword('lightsalmon')(summaryItem.rating)}
+    `
+  })
+  const printPeople = summaryPeopleArr.map(summaryItem => {
+    if (ctx.parent.file) {
+      return `\n#### ${summaryItem.summaryTitle}\n${summaryItem.people.map(person => { return `- ${person.name}    *${person.name_en}*\n` }).join('')}`
+    }
+    return `
+      ${chalk.keyword('lightsalmon')(summaryItem.summaryTitle)}
+      ${summaryItem.people.map(person => { return `\n        ${chalk.keyword('wheat')(person.name)}    ${chalk.italic.keyword('wheat')(person.name_en)}` }).join('')}
+    `
+  })
+  const printTop10 = summaryTop10Arr.map(summaryItem => {
+    if (ctx.parent.file) {
+      return `\n#### ${summaryItem.summaryTitle}\n${summaryItem.movies.map(movie => { return `- **${movie.title}**    ${movie.orig_title ? '*' + movie.orig_title + '*' : ''}   **${movie.rating}**\n` }).join('')}`
+    }
+    return `
+      ${chalk.keyword('lightsalmon')(summaryItem.summaryTitle)}
+      ${summaryItem.movies.map(movie => { return `\n        ${chalk.keyword('wheat')(movie.title)}    ${chalk.italic.keyword('wheat')(movie.orig_title ? movie.orig_title : '')}   ${chalk.italic.keyword('lightcoral')(movie.rating)}` }).join('')}
+    `
+  })
+  bar.tick(5, { info: '处理每个总结项目信息...' })
+  if (ctx.parent.file) {
+    fs.writeFile(ctx.parent.file, `## 排行榜：\n${printTop10.join('')}\n\n## 台词：\n${printDialogue.join('')}\n\n## 明星：\n${printPeople.join('')}`, 'utf-8', (err) => {
+      if (err) throw err
+      else bar.tick(10, { info: '转换年度总结数据完毕，已输出到文件中' })
+      console.log(`数据已经输出在 ${chalk.underline.bold.red(path.resolve(process.cwd(), ctx.parent.file))}`)
+    })
+  } else {
+    bar.tick(10, { info: '转换年度总结数据完毕，已输出到文件中' })
+    console.log(`
+      ${chalk.bold.keyword('lightsalmon')('排行榜：')}
+      ${printTop10.join('')}
+      ${chalk.bold.keyword('lightsalmon')('台词：')}
+      ${printDialogue.join('')}
+      ${chalk.bold.keyword('lightsalmon')('明星：')}
+      ${printPeople.join('')}
+    `)
+  }
+}
+
+const search = async (query, ctx) => {
+  if (ctx.movie) {
+    searchMovie(ctx.movie)
+  } else if (ctx.star) {
+    searchStar(ctx.star)
+  } else {
+    searchMovie(query)
+  }
+}
+
+const searchMovie = async (movie) => {
+  bar.tick(20, { info: '正在查询...' })
+  const result = JSON.parse(await rp(`${URL.SEARCH}${encodeURIComponent(movie)}`))
+  const movieSearched = result.subjects.length !== 0 ? result.subjects[0] : null
+  if (!movieSearched) {
+    bar.tick(80, { info: '查询失败...' })
+    return console.log(chalk.keyword('wheat')('查无此结果，请精确输入'))
+  }
+  bar.tick(30, { info: '查询成功' })
+  bar.tick(10, { info: '获取具体信息...' })
+  const movieHTMLString = await rp(movieSearched.alt)
+  const $ = cheerio.load(movieHTMLString)
+  const actors = $('span.actor .attrs').text()
+  const directors = $('a[rel="v:directedBy"]').text()
+  const releaseDate = $('span[property="v:initialReleaseDate"]').text() ? $('span[property="v:initialReleaseDate"]').text() : ''
+  const runtime = $('span[property="v:runtime"]').text() ? $('span[property="v:runtime"]').text() : ''
+  const summary = $('span[property="v:summary"]').text().split('\n').map(string => string.trim()).filter(string => string !== '')
+  const roleList = Array.from($('.celebrities-list .celebrity').map((index, celebrity) => {
+    return {
+      name: $(celebrity).find('span.name').text().replace(/^\s+|\s+$/g, ''),
+      role: $(celebrity).find('span.role').text().replace(/^\s+|\s+$/g, '')
+    }
+  }))
+  const resultMovie = Object.assign(movieSearched, { actors, directors, releaseDate, runtime, summary, roleList })
+  bar.tick(20, { info: '获取具体信息成功' })
+  bar.tick(10, { info: '拼接展示文本...' })
+  const print =`
+    ${chalk.bold.keyword('wheat')('标   题')} - ${chalk.bold.keyword('skyblue')(resultMovie.title)} ${chalk.italic.bold.keyword('skyblue')(resultMovie.original_title)}
+    ${chalk.bold.keyword('wheat')('评   分')} - ${chalk.bold.keyword('skyblue')(resultMovie.rating.average)}
+    ${chalk.bold.keyword('wheat')('题   材')} - ${chalk.bold.keyword('skyblue')(resultMovie.genres.join(' / '))}
+    ${chalk.bold.keyword('wheat')('演职员表')}\n      ${chalk.bold.keyword('skyblue')(resultMovie.roleList ? resultMovie.roleList.filter(role => role.role !== '').map((role, index) => `  ${chalk.white('-')} ${role.name}    ${role.role}`).join(`\n      `) : '暂无信息')}
+    ${chalk.bold.keyword('wheat')('上映日期')} - ${chalk.bold.keyword('skyblue')(resultMovie.releaseDate ? resultMovie.releaseDate.replace(/\)/g, '\) ') : '暂无信息')}
+    ${chalk.bold.keyword('wheat')('影片时长')} - ${chalk.bold.keyword('skyblue')(resultMovie.runtime !== '' ? resultMovie.runtime : '暂无信息')}
+    ${chalk.bold.keyword('wheat')('剧情简介')}\n        ${chalk.bold.keyword('skyblue')(resultMovie.summary ? resultMovie.summary.join('\n        ') : '暂无信息')}
+    ${chalk.bold.keyword('wheat')('豆瓣链接')} - ${chalk.bold.keyword('skyblue')(resultMovie.alt)}
+  `
+  bar.tick(10, { info: '拼接完毕' })
+  console.log(print)
+}
+
+const searchStar = async (star) => {
+  bar.tick(20, { info: '正在查询...' })
+  const result = JSON.parse(await rp(`${URL.SEARCH}${encodeURIComponent(star)}`))
+  const starSearchedItem = result.subjects.length !== 0 ? result.subjects[0] : null
+  if (!starSearchedItem) {
+    bar.tick(80, { info: '查询失败...' })
+    return console.log(chalk.keyword('wheat')('查无此结果，请精确输入'))
+  }
+  // 遍历 casts 和 directors 找到链接
+  let starURL = ''
+  const tempArr = [...starSearchedItem.casts, ...starSearchedItem.directors]
+  tempArr.forEach(item => {
+    if (item.name === star) {
+      return starURL = item.alt
+    }
+  })
+  if (!starURL) {
+    bar.tick(80, { info: '查询失败...' })
+    return console.log(chalk.keyword('wheat')('查无此结果，请精确输入'))
+  }
+  bar.tick(30, { info: '查询成功' })
+  bar.tick(10, { info: '获取具体信息...' })
+  // 抓取具体
+  const starHTMLString = await rp(starURL)
+  const $ = cheerio.load(starHTMLString)
+  const name = $('#content h1').text()
+  const infoArr = $('#headline .info ul').text().split('\n').filter(item => item.trim() !== '').map(item => item.replace(/^\s+|\s+$/g, ''))
+  const infoResults = []
+  infoArr.forEach((info, index) => {
+    if (index % 2 === 0) {
+      infoResults.push({ key: info })
+    } else {
+      infoResults[Math.floor(index / 2)].value = info
+    }
+  })
+  const infoPrint = infoResults.map((info, index) => index === 0 ? `${info.key}    ${info.value}\n` : `        ${info.key}    ${info.value}\n`).join('')
+  const introduction = $('#intro .bd').text().replace(/^\s+|\s+$/g, '').split(/\s+|\s+/g)
+  const top5 = $('#best_movies .bd').text().split('\n').filter(item => item.trim() !== '').map(item => item.replace(/^\s+|\s+$/g, ''))
+  const top5Arr = []
+  top5.forEach((info, index) => {
+    if (index % 3 === 0) {
+      top5Arr.push({ name: info })
+    }
+    if (index % 3 === 1) {
+      top5Arr[Math.floor(index / 3)].rating = info
+    }
+    if (index % 3 === 2) {
+      top5Arr[Math.floor(index / 3)].year = info
+    }
+  })
+  const top5Print = top5Arr.map((top, index) => index === 0 ? `${top.name}   ${top.rating}   ${top.year}\n` : `        ${top.name}   ${top.rating}   ${top.year}\n`).join('')
+  bar.tick(20, { info: '获取具体信息成功' })
+  bar.tick(10, { info: '拼接展示文本...' })
+  const print =`
+    ${chalk.bold.keyword('lightsalmon')(name)}\n
+      ${chalk.bold.keyword('wheat')('基本信息：')}\n
+        ${infoPrint}
+      ${chalk.bold.keyword('wheat')('个人简介')}\n
+        ${introduction.join('\n        ')}\n
+      ${chalk.bold.keyword('wheat')('最佳作品：')}\n
+        ${top5Print}
+  `
+  bar.tick(10, { info: '拼接完毕' })
+  console.log(print)
 }
 
 exports.show = show
